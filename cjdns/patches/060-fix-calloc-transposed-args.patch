@@ -1,0 +1,1614 @@
+From: ntbowen <ntbowen@example.com>
+Date: Tue, 20 May 2025 18:47:19 +0800
+Subject: [PATCH] 修复calloc参数顺序错误
+
+修复cjdns代码中所有Allocator_calloc和Allocator__calloc函数调用的参数顺序问题。
+在C语言中，calloc函数的正确参数顺序应该是先指定元素数量，然后是每个元素的大小。
+这个补丁将所有形式为Allocator_calloc(alloc, sizeof(struct X), count)的调用
+改为Allocator_calloc(alloc, count, sizeof(struct X))，以及相应的Allocator__calloc调用。
+
+Signed-off-by: ntbowen <ntbowen@example.com>
+---
+
+--- a/net/UpperDistributor.c	2025-05-20 18:49:04.881443057 +0800
++++ b/net/UpperDistributor.c	2025-05-20 18:49:04.882443073 +0800
+@@ -253,7 +253,7 @@
+         return 0;
+     }
+     struct UpperDistributor_Handler* out = *outputList =
+-        Allocator_calloc(alloc, sizeof(struct UpperDistributor_Handler), udp->handlers->count);
++        Allocator_calloc(alloc, udp->handlers->count, sizeof(struct UpperDistributor_Handler));
+     for (int i = 0; i < (int)udp->handlers->count; i++) {
+         Bits_memcpy(&out[i], udp->handlers->values[i], sizeof(struct UpperDistributor_Handler));
+     }
+@@ -273,7 +273,7 @@
+ 
+     struct Allocator* alloc = Allocator_child(ud->alloc);
+     struct UpperDistributor_Handler_pvt* udhp =
+-        Allocator_calloc(alloc, sizeof(struct UpperDistributor_Handler_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct UpperDistributor_Handler_pvt));
+ 
+     udhp->alloc = alloc;
+     udhp->pub.udpPort = udpPort;
+@@ -289,7 +289,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct UpperDistributor_pvt* out =
+-        Allocator_calloc(alloc, sizeof(struct UpperDistributor_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct UpperDistributor_pvt));
+     Identity_set(out);
+     out->handlers = Map_OfHandlers_new(alloc);
+     out->eventIf.send = incomingFromEventIf;
+--- a/net/ControlHandler.c	2025-05-20 18:49:04.886443138 +0800
++++ b/net/ControlHandler.c	2025-05-20 18:49:04.888443170 +0800
+@@ -386,7 +386,7 @@
+                                           uint8_t myPublicKey[32])
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct ControlHandler_pvt* ch = Allocator_calloc(alloc, sizeof(struct ControlHandler_pvt), 1);
++    struct ControlHandler_pvt* ch = Allocator_calloc(alloc, 1, sizeof(struct ControlHandler_pvt));
+     ch->alloc = alloc;
+     ch->log = logger;
+     Bits_memcpy(ch->myPublicKey, myPublicKey, 32);
+--- a/net/InterfaceController.c	2025-05-20 18:49:04.892443235 +0800
++++ b/net/InterfaceController.c	2025-05-20 18:49:04.893443251 +0800
+@@ -679,7 +679,7 @@
+     }
+ 
+     struct Allocator* epAlloc = Allocator_child(ici->alloc);
+-    struct Peer* ep = Allocator_calloc(epAlloc, sizeof(struct Peer), 1);
++    struct Peer* ep = Allocator_calloc(epAlloc, 1, sizeof(struct Peer));
+     struct Sockaddr* lladdr = Sockaddr_clone(lladdrInmsg, epAlloc);
+     ep->alloc = epAlloc;
+     ep->ici = ici;
+@@ -743,7 +743,7 @@
+     struct Allocator* epAlloc = Allocator_child(ici->alloc);
+     lladdr = Sockaddr_clone(lladdr, epAlloc);
+ 
+-    struct Peer* ep = Allocator_calloc(epAlloc, sizeof(struct Peer), 1);
++    struct Peer* ep = Allocator_calloc(epAlloc, 1, sizeof(struct Peer));
+     Identity_set(ep);
+     ep->alloc = epAlloc;
+     ep->ici = ici;
+@@ -885,7 +885,7 @@
+     struct InterfaceController_pvt* ic = Identity_check((struct InterfaceController_pvt*) ifc);
+ 
+     struct InterfaceController_Iface_pvt* ici =
+-        Allocator_calloc(alloc, sizeof(struct InterfaceController_Iface_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct InterfaceController_Iface_pvt));
+     ici->pub.name = String_clone(name, alloc);
+     ici->peerMap.allocator = alloc;
+     ici->ic = ic;
+@@ -1011,7 +1011,7 @@
+     struct Sockaddr* lladdr = Sockaddr_clone(lladdrParm, epAlloc);
+ 
+     // TODO(cjd): eps are created in 3 places, there should be a factory function.
+-    struct Peer* ep = Allocator_calloc(epAlloc, sizeof(struct Peer), 1);
++    struct Peer* ep = Allocator_calloc(epAlloc, 1, sizeof(struct Peer));
+     int index = Map_EndpointsBySockaddr_put(&lladdr, &ep, &ici->peerMap);
+     Assert_true(index >= 0);
+     ep->alloc = epAlloc;
+@@ -1075,7 +1075,7 @@
+     }
+ 
+     struct InterfaceController_PeerStats* stats =
+-        Allocator_calloc(alloc, sizeof(struct InterfaceController_PeerStats), count);
++        Allocator_calloc(alloc, count, sizeof(struct InterfaceController_PeerStats));
+ 
+     int xcount = 0;
+     for (int j = 0; j < ic->icis->length; j++) {
+--- a/net/PeerLink.c	2025-05-20 18:49:04.898443332 +0800
++++ b/net/PeerLink.c	2025-05-20 18:49:04.900443364 +0800
+@@ -69,7 +69,7 @@
+ struct PeerLink* PeerLink_new(struct EventBase* base, struct Allocator* allocator)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct PeerLink_pvt* pl = Allocator_calloc(alloc, sizeof(struct PeerLink_pvt), 1);
++    struct PeerLink_pvt* pl = Allocator_calloc(alloc, 1, sizeof(struct PeerLink_pvt));
+     Identity_set(pl);
+     pl->base = base;
+     pl->alloc = alloc;
+--- a/net/EventEmitter.c	2025-05-20 18:49:04.903443412 +0800
++++ b/net/EventEmitter.c	2025-05-20 18:49:04.905443445 +0800
+@@ -341,7 +341,7 @@
+ {
+     struct EventEmitter_pvt* ee = Identity_check((struct EventEmitter_pvt*) emitter);
+     struct Allocator* alloc = Allocator_child(ee->alloc);
+-    struct Pathfinder* pf = Allocator_calloc(alloc, sizeof(struct Pathfinder), 1);
++    struct Pathfinder* pf = Allocator_calloc(alloc, 1, sizeof(struct Pathfinder));
+     pf->ee = ee;
+     pf->iface.send = incomingFromPathfinder;
+     pf->alloc = alloc;
+@@ -360,7 +360,7 @@
+                                       uint8_t* publicKey)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct EventEmitter_pvt* ee = Allocator_calloc(alloc, sizeof(struct EventEmitter_pvt), 1);
++    struct EventEmitter_pvt* ee = Allocator_calloc(alloc, 1, sizeof(struct EventEmitter_pvt));
+     ee->log = log;
+     ee->alloc = alloc;
+     ee->trickIf.send = incomingFromCore;
+--- a/net/Benchmark.c	2025-05-20 18:49:04.909443509 +0800
++++ b/net/Benchmark.c	2025-05-20 18:49:04.911443542 +0800
+@@ -148,7 +148,7 @@
+     Key_gen(ipv6, publicKey, privateKeyA, ctx->rand);
+     Key_gen(ipv6, publicKey, privateKeyB, ctx->rand);
+ 
+-    struct SwitchingContext* sc = Allocator_calloc(alloc, sizeof(struct SwitchingContext), 1);
++    struct SwitchingContext* sc = Allocator_calloc(alloc, 1, sizeof(struct SwitchingContext));
+     Identity_set(sc);
+     sc->benchmarkCtx = ctx;
+     sc->aliceIf.send = aliceToBob;
+@@ -222,7 +222,7 @@
+ void Benchmark_runAll(void)
+ {
+     struct Allocator* alloc = MallocAllocator_new(1<<22);
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+     ctx->base = EventBase_new(alloc);
+--- a/net/SessionManager.c	2025-05-20 18:49:04.915443606 +0800
++++ b/net/SessionManager.c	2025-05-20 18:49:04.917443638 +0800
+@@ -188,7 +188,7 @@
+ {
+     struct SessionManager_pvt* sm = Identity_check((struct SessionManager_pvt*) manager);
+     struct SessionManager_HandleList* out =
+-        Allocator_calloc(alloc, sizeof(struct SessionManager_HandleList), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct SessionManager_HandleList));
+     uint32_t* buff = Allocator_calloc(alloc, 4, sm->ifaceMap.count);
+     out->length = sm->ifaceMap.count;
+     out->handles = buff;
+@@ -312,7 +312,7 @@
+         return sess;
+     }
+     struct Allocator* alloc = Allocator_child(sm->alloc);
+-    sess = Allocator_calloc(alloc, sizeof(struct SessionManager_Session_pvt), 1);
++    sess = Allocator_calloc(alloc, 1, sizeof(struct SessionManager_Session_pvt));
+     Identity_set(sess);
+ 
+     sess->pub.caSession = CryptoAuth_newSession(sm->cryptoAuth, alloc, pubKey, false, "inner");
+@@ -654,7 +654,7 @@
+     }
+     struct Allocator* lookupAlloc = Allocator_child(sm->alloc);
+     struct BufferedMessage* buffered =
+-        Allocator_calloc(lookupAlloc, sizeof(struct BufferedMessage), 1);
++        Allocator_calloc(lookupAlloc, 1, sizeof(struct BufferedMessage));
+     buffered->msg = msg;
+     buffered->alloc = lookupAlloc;
+     buffered->timeSentMilliseconds = Time_currentTimeMilliseconds(sm->eventBase);
+@@ -874,7 +874,7 @@
+                                           struct EventEmitter* ee)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct SessionManager_pvt* sm = Allocator_calloc(alloc, sizeof(struct SessionManager_pvt), 1);
++    struct SessionManager_pvt* sm = Allocator_calloc(alloc, 1, sizeof(struct SessionManager_pvt));
+     sm->alloc = alloc;
+     sm->pub.switchIf.send = incomingFromSwitchIf;
+     sm->pub.insideIf.send = incomingFromInsideIf;
+--- a/net/NetCore.c	2025-05-20 18:49:04.921443703 +0800
++++ b/net/NetCore.c	2025-05-20 18:49:04.923443735 +0800
+@@ -37,7 +37,7 @@
+                             struct Log* log)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct NetCore* nc = Allocator_calloc(alloc, sizeof(struct NetCore), 1);
++    struct NetCore* nc = Allocator_calloc(alloc, 1, sizeof(struct NetCore));
+     nc->alloc = alloc;
+     nc->base = base;
+     nc->rand = rand;
+@@ -46,7 +46,7 @@
+     struct CryptoAuth* ca = nc->ca = CryptoAuth_new(alloc, privateKey, base, log, rand);
+     struct EventEmitter* ee = nc->ee = EventEmitter_new(alloc, log, ca->publicKey);
+ 
+-    struct Address* myAddress = nc->myAddress = Allocator_calloc(alloc, sizeof(struct Address), 1);
++    struct Address* myAddress = nc->myAddress = Allocator_calloc(alloc, 1, sizeof(struct Address));
+     Bits_memcpy(myAddress->key, ca->publicKey, 32);
+     Address_getPrefix(myAddress);
+     myAddress->protocolVersion = Version_CURRENT_PROTOCOL;
+--- a/net/TUNAdapter.c	2025-05-20 18:49:04.926443784 +0800
++++ b/net/TUNAdapter.c	2025-05-20 18:49:04.928443816 +0800
+@@ -147,7 +147,7 @@
+ struct TUNAdapter* TUNAdapter_new(struct Allocator* allocator, struct Log* log, uint8_t myIp6[16])
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct TUNAdapter_pvt* out = Allocator_calloc(alloc, sizeof(struct TUNAdapter_pvt), 1);
++    struct TUNAdapter_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct TUNAdapter_pvt));
+     out->pub.tunIf.send = incomingFromTunIf;
+     out->pub.ipTunnelIf.send = incomingFromIpTunnelIf;
+     out->pub.upperDistributorIf.send = incomingFromUpperDistributorIf;
+--- a/net/SwitchPinger.c	2025-05-20 18:49:04.932443881 +0800
++++ b/net/SwitchPinger.c	2025-05-20 18:49:04.934443913 +0800
+@@ -243,7 +243,7 @@
+ 
+     uint32_t version = p->context->incomingVersion;
+     struct SwitchPinger_Response* resp =
+-        Allocator_calloc(p->pub.pingAlloc, sizeof(struct SwitchPinger_Response), 1);
++        Allocator_calloc(p->pub.pingAlloc, 1, sizeof(struct SwitchPinger_Response));
+     resp->version = p->context->incomingVersion;
+     resp->res = err;
+     resp->label = label;
+--- a/util/ArrayList.c	2025-05-20 18:49:04.938443977 +0800
++++ b/util/ArrayList.c	2025-05-20 18:49:04.940444010 +0800
+@@ -34,8 +34,8 @@
+ 
+ void* ArrayList_new(struct Allocator* alloc, int initialCapacity)
+ {
+-    struct ArrayList_pvt* l = Allocator_calloc(alloc, sizeof(struct ArrayList_pvt), 1);
+-    l->elements = Allocator_calloc(alloc, sizeof(char*), initialCapacity);
++    struct ArrayList_pvt* l = Allocator_calloc(alloc, 1, sizeof(struct ArrayList_pvt));
++    l->elements = Allocator_calloc(alloc, initialCapacity, sizeof(char*));
+     l->capacity = initialCapacity;
+     l->alloc = alloc;
+     Identity_set(l);
+--- a/util/GlobalConfig.c	2025-05-20 18:49:04.944444075 +0800
++++ b/util/GlobalConfig.c	2025-05-20 18:49:04.946444107 +0800
+@@ -37,7 +37,7 @@
+ 
+ struct GlobalConfig* GlobalConfig_new(struct Allocator* alloc)
+ {
+-    struct GlobalConfig_pvt* gcp = Allocator_calloc(alloc, sizeof(struct GlobalConfig_pvt), 1);
++    struct GlobalConfig_pvt* gcp = Allocator_calloc(alloc, 1, sizeof(struct GlobalConfig_pvt));
+     Identity_set(gcp);
+     gcp->alloc = alloc;
+     return &gcp->pub;
+--- a/util/Security.c	2025-05-20 18:49:04.951444188 +0800
++++ b/util/Security.c	2025-05-20 18:49:04.953444220 +0800
+@@ -167,7 +167,7 @@
+ 
+ struct Security* Security_new(struct Allocator* alloc, struct Log* log, struct EventBase* base)
+ {
+-    struct Security_pvt* sec = Allocator_calloc(alloc, sizeof(struct Security_pvt), 1);
++    struct Security_pvt* sec = Allocator_calloc(alloc, 1, sizeof(struct Security_pvt));
+     Identity_set(sec);
+     sec->setupAlloc = Allocator_child(alloc);
+     Timeout_setInterval(fail, sec, 20000, base, sec->setupAlloc);
+@@ -178,7 +178,7 @@
+ Er_DEFUN(struct Security_Permissions* Security_checkPermissions(struct Allocator* alloc))
+ {
+     struct Security_Permissions* out =
+-        Allocator_calloc(alloc, sizeof(struct Security_Permissions), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct Security_Permissions));
+ 
+     out->noOpenFiles = !canOpenFiles();
+     out->seccompExists = Seccomp_exists();
+--- a/util/test/Process_test.c	2025-05-20 18:49:04.963444381 +0800
++++ b/util/test/Process_test.c	2025-05-20 18:49:04.965444414 +0800
+@@ -142,7 +142,7 @@
+     struct Allocator* alloc = MallocAllocator_new(1<<20);
+     struct EventBase* eb = EventBase_new(alloc);
+     struct Log* log = FileWriterLog_new(stdout, alloc);
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+     ctx->base = eb;
+--- a/util/test/Seccomp_test.c	2025-05-20 18:49:04.969444478 +0800
++++ b/util/test/Seccomp_test.c	2025-05-20 18:49:04.971444510 +0800
+@@ -80,7 +80,7 @@
+ 
+ static int child(char* pipeName, struct Allocator* alloc, struct Log* logger)
+ {
+-    struct ChildCtx* ctx = Allocator_calloc(alloc, sizeof(struct ChildCtx), 1);
++    struct ChildCtx* ctx = Allocator_calloc(alloc, 1, sizeof(struct ChildCtx));
+     ctx->base = EventBase_new(alloc);
+     ctx->alloc = alloc;
+     ctx->log = logger;
+@@ -126,7 +126,7 @@
+     Random_base32(rand, (uint8_t*)randName, 31);
+     String* name = String_printf(alloc, "%s%scjdns-test-%s", Pipe_PATH, Pipe_PATH_SEP, randName);
+ 
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+     ctx->iface.send = receiveMessageParent;
+--- a/util/platform/netdev/NetPlatform_linux.c	2025-05-20 18:49:04.981444672 +0800
++++ b/util/platform/netdev/NetPlatform_linux.c	2025-05-20 18:49:04.984444720 +0800
+@@ -428,7 +428,7 @@
+ {
+     struct RouteInfo* out = NULL;
+     for (int i = 0; i < prefixCount; i++) {
+-        struct RouteInfo* ri = Allocator_calloc(alloc, sizeof(struct RouteInfo), 1);
++        struct RouteInfo* ri = Allocator_calloc(alloc, 1, sizeof(struct RouteInfo));
+         ri->protocol = RTPROT_CJDNS;
+         ri->prefix = Sockaddr_getPrefix(prefixSet[i]);
+         ri->af = Sockaddr_getFamily(prefixSet[i]);
+--- a/util/Seccomp_linux.c	2025-05-20 18:49:04.988444785 +0800
++++ b/util/Seccomp_linux.c	2025-05-20 18:49:04.990444817 +0800
+@@ -106,7 +106,7 @@
+     }
+ 
+     // copy into output filter array...
+-    struct sock_filter* sf = Allocator_calloc(alloc, sizeof(struct sock_filter), totalOut);
++    struct sock_filter* sf = Allocator_calloc(alloc, totalOut, sizeof(struct sock_filter));
+     int outI = 0;
+     for (int i = 0; i < inputLen; i++) {
+         if (input[i].label == 0) {
+--- a/util/Set.c	2025-05-20 18:49:04.994444882 +0800
++++ b/util/Set.c	2025-05-20 18:49:04.996444914 +0800
+@@ -98,7 +98,7 @@
+ static struct Entry* allocateBlock(struct Set_pvt* set)
+ {
+     struct Allocator* alloc = Allocator_child(set->alloc);
+-    struct Block* newBlock = Allocator_calloc(alloc, sizeof(struct Block), 1);
++    struct Block* newBlock = Allocator_calloc(alloc, 1, sizeof(struct Block));
+     newBlock->alloc = alloc;
+     newBlock->next = set->block;
+     set->block = newBlock;
+@@ -242,7 +242,7 @@
+ 
+ struct Set* Set_new(struct Allocator* alloc, Set_HashCode_t hashCode, Set_Compare_t compare)
+ {
+-    struct Set_pvt* out = Allocator_calloc(alloc, sizeof(struct Set_pvt), 1);
++    struct Set_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct Set_pvt));
+     Identity_set(out);
+     out->alloc = alloc;
+     out->compare = compare;
+--- a/util/events/libuv/UDPAddrIface.c	2025-05-20 18:49:05.000444979 +0800
++++ b/util/events/libuv/UDPAddrIface.c	2025-05-20 18:49:05.002445011 +0800
+@@ -159,7 +159,7 @@
+         //Log_debug(context->logger, "0 length read");
+ 
+     } else {
+-        struct Message* m = Allocator_calloc(alloc, sizeof(struct Message), 1);
++        struct Message* m = Allocator_calloc(alloc, 1, sizeof(struct Message));
+         m->length = nread;
+         m->padding = UDPAddrIface_PADDING_AMOUNT + context->pub.generic.addr->addrLen;
+         m->capacity = buf->len;
+--- a/util/events/libuv/Timeout.c	2025-05-20 18:49:05.006445076 +0800
++++ b/util/events/libuv/Timeout.c	2025-05-20 18:49:05.008445108 +0800
+@@ -116,7 +116,7 @@
+ {
+     struct EventBase_pvt* base = EventBase_privatize(eventBase);
+     struct Allocator* alloc = Allocator__child(allocator, file, line);
+-    struct Timeout* timeout = Allocator_calloc(alloc, sizeof(struct Timeout), 1);
++    struct Timeout* timeout = Allocator_calloc(alloc, 1, sizeof(struct Timeout));
+ 
+     timeout->callback = callback;
+     timeout->callbackContext = callbackContext;
+--- a/util/events/libuv/FakeNetwork.c	2025-05-20 18:49:05.013445189 +0800
++++ b/util/events/libuv/FakeNetwork.c	2025-05-20 18:49:05.015445221 +0800
+@@ -136,7 +136,7 @@
+         return NULL;
+     }
+     struct FakeNetwork_UDPIface_pvt* fnip =
+-        Allocator_calloc(alloc, sizeof(struct FakeNetwork_UDPIface_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct FakeNetwork_UDPIface_pvt));
+     Map_OfIfaces_put(&addr, &fnip, &fnp->map);
+     fnip->fnp = fnp;
+     fnip->pub.generic.alloc = alloc;
+@@ -151,7 +151,7 @@
+                                     struct Log* logger)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct FakeNetwork_pvt* fnp = Allocator_calloc(alloc, sizeof(struct FakeNetwork_pvt), 1);
++    struct FakeNetwork_pvt* fnp = Allocator_calloc(alloc, 1, sizeof(struct FakeNetwork_pvt));
+     fnp->alloc = alloc;
+     fnp->log = logger;
+     fnp->base = base;
+--- a/util/events/libuv/Pipe.c	2025-05-20 18:49:05.019445286 +0800
++++ b/util/events/libuv/Pipe.c	2025-05-20 18:49:05.021445318 +0800
+@@ -98,7 +98,7 @@
+     int ret = -1;
+     if (pipe->ipc && m->associatedFd && !Defined(win32)) {
+         int fd = Message_getAssociatedFd(m);
+-        uv_stream_t* fake_handle = Allocator_calloc(req->alloc, sizeof(uv_stream_t), 1);
++        uv_stream_t* fake_handle = Allocator_calloc(req->alloc, 1, sizeof(uv_stream_t));
+         #ifndef win32
+             fake_handle->io_watcher.fd = fd;
+         #endif
+@@ -210,7 +210,7 @@
+ 
+     } else {
+         Assert_true(alloc);
+-        struct Message* m = Allocator_calloc(alloc, sizeof(struct Message), 1);
++        struct Message* m = Allocator_calloc(alloc, 1, sizeof(struct Message));
+         m->length = nread;
+         m->padding = Pipe_PADDING_AMOUNT;
+         m->capacity = buf->len;
+--- a/util/events/libuv/PipeServer.c	2025-05-20 18:49:05.025445383 +0800
++++ b/util/events/libuv/PipeServer.c	2025-05-20 18:49:05.027445415 +0800
+@@ -153,7 +153,7 @@
+         Allocator_free(pipeAlloc);
+         return;
+     }
+-    struct Client* cli = Allocator_calloc(pipeAlloc, sizeof(struct Client), 1);
++    struct Client* cli = Allocator_calloc(pipeAlloc, 1, sizeof(struct Client));
+     cli->iface.send = incomingFromClient;
+     Iface_plumb(&cli->iface, &p->iface);
+     cli->alloc = pipeAlloc;
+--- a/util/events/libuv/Process.c	2025-05-20 18:49:05.030445463 +0800
++++ b/util/events/libuv/Process.c	2025-05-20 18:49:05.032445496 +0800
+@@ -59,14 +59,14 @@
+ 
+     int i;
+     for (i = 0; args[i]; i++) ;
+-    char** binAndArgs = Allocator_calloc(alloc, sizeof(char*), i+2);
++    char** binAndArgs = Allocator_calloc(alloc, i+2, sizeof(char*));
+     for (i = 0; args[i]; i++) {
+         binAndArgs[i+1] = args[i];
+     }
+     binAndArgs[0] = binaryPath;
+     binAndArgs[i+1] = NULL;
+ 
+-    struct Process_pvt* p = Allocator_calloc(alloc, sizeof(struct Process_pvt), 1);
++    struct Process_pvt* p = Allocator_calloc(alloc, 1, sizeof(struct Process_pvt));
+     p->alloc = alloc;
+     Identity_set(p);
+     Allocator_onFree(alloc, onFree, p);
+--- a/util/events/libuv/EventBase.c	2025-05-20 18:49:05.037445576 +0800
++++ b/util/events/libuv/EventBase.c	2025-05-20 18:49:05.039445609 +0800
+@@ -62,7 +62,7 @@
+ struct EventBase* EventBase_new(struct Allocator* allocator)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct EventBase_pvt* base = Allocator_calloc(alloc, sizeof(struct EventBase_pvt), 1);
++    struct EventBase_pvt* base = Allocator_calloc(alloc, 1, sizeof(struct EventBase_pvt));
+     base->loop = uv_loop_new();
+     base->alloc = alloc;
+     Identity_set(base);
+--- a/util/Setuid_linux.c	2025-05-20 18:49:05.049445770 +0800
++++ b/util/Setuid_linux.c	2025-05-20 18:49:05.051445803 +0800
+@@ -52,8 +52,8 @@
+ 
+ Er_DEFUN(void Setuid_preSetuid(struct Allocator* alloc))
+ {
+-    cap_user_header_t hdr = Allocator_calloc(alloc, sizeof(*hdr), 1);
+-    cap_user_data_t data = Allocator_calloc(alloc, sizeof(*data), 2);
++    cap_user_header_t hdr = Allocator_calloc(alloc, 1, sizeof(*hdr));
++    cap_user_data_t data = Allocator_calloc(alloc, 2, sizeof(*data));
+ 
+     hdr->version = _LINUX_CAPABILITY_VERSION_3;
+     hdr->pid = 0;
+@@ -76,8 +76,8 @@
+ 
+ Er_DEFUN(void Setuid_postSetuid(struct Allocator* alloc))
+ {
+-    cap_user_header_t hdr = Allocator_calloc(alloc, sizeof(*hdr), 1);
+-    cap_user_data_t data = Allocator_calloc(alloc, sizeof(*data), 2);
++    cap_user_header_t hdr = Allocator_calloc(alloc, 1, sizeof(*hdr));
++    cap_user_data_t data = Allocator_calloc(alloc, 2, sizeof(*data));
+ 
+     hdr->version = _LINUX_CAPABILITY_VERSION_3;
+     hdr->pid = 0;
+--- a/util/Security_win32.c	2025-05-20 18:49:05.055445867 +0800
++++ b/util/Security_win32.c	2025-05-20 18:49:05.057445899 +0800
+@@ -86,7 +86,7 @@
+ 
+ struct Security* Security_new(struct Allocator* alloc, struct Log* log, struct EventBase* base)
+ {
+-    struct Security_pvt* sec = Allocator_calloc(alloc, sizeof(struct Security_pvt), 1);
++    struct Security_pvt* sec = Allocator_calloc(alloc, 1, sizeof(struct Security_pvt));
+     Identity_set(sec);
+     sec->setupAlloc = Allocator_child(alloc);
+     Timeout_setInterval(fail, sec, 20000, base, sec->setupAlloc);
+@@ -97,6 +97,6 @@
+ Er_DEFUN(struct Security_Permissions* Security_checkPermissions(struct Allocator* alloc))
+ {
+     struct Security_Permissions* out =
+-        Allocator_calloc(alloc, sizeof(struct Security_Permissions), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct Security_Permissions));
+     Er_ret(out);
+ }
+--- a/exception/Er.c	2025-05-20 18:49:05.060445948 +0800
++++ b/exception/Er.c	2025-05-20 18:49:05.062445980 +0800
+@@ -43,7 +43,7 @@
+ 
+         snprintf(buf, len, "%s:%d ", file, line);
+         vsnprintf(&buf[written], len - written, format, args);
+-        struct Er_Ret* res = Allocator_calloc(alloc, sizeof(struct Er_Ret), 1);
++        struct Er_Ret* res = Allocator_calloc(alloc, 1, sizeof(struct Er_Ret));
+         res->message = buf;
+         va_end(args);
+         return res;
+--- a/client/cjdroute2.c	2025-05-20 18:49:05.067446061 +0800
++++ b/client/cjdroute2.c	2025-05-20 18:49:05.069446093 +0800
+@@ -556,7 +556,7 @@
+     struct Chunk* c = NULL;
+     uint32_t totalLength = 0;
+     do {
+-        struct Chunk* cc = Allocator_calloc(child, sizeof(struct Chunk), 1);
++        struct Chunk* cc = Allocator_calloc(child, 1, sizeof(struct Chunk));
+         cc->length = fread(cc->buf, 1, Chunk_MAX_LEN, f);
+         totalLength += cc->length;
+         cc->next = c;
+--- a/client/AdminClient.c	2025-05-20 18:49:05.073446158 +0800
++++ b/client/AdminClient.c	2025-05-20 18:49:05.075446190 +0800
+@@ -249,7 +249,7 @@
+ {
+     struct Allocator* promiseAlloc = Allocator_child(alloc);
+     struct AdminClient_Promise* promise =
+-        Allocator_calloc(promiseAlloc, sizeof(struct AdminClient_Promise), 1);
++        Allocator_calloc(promiseAlloc, 1, sizeof(struct AdminClient_Promise));
+     promise->alloc = promiseAlloc;
+ 
+     Dict gc = Dict_CONST(String_CONST("q"), String_OBJ(String_CONST("cookie")), NULL);
+--- a/test/TestFramework.c	2025-05-20 18:49:05.079446255 +0800
++++ b/test/TestFramework.c	2025-05-20 18:49:05.081446287 +0800
+@@ -152,7 +152,7 @@
+ 
+     SubnodePathfinder_start(spf);
+ 
+-    struct TestFramework* tf = Allocator_calloc(allocator, sizeof(struct TestFramework), 1);
++    struct TestFramework* tf = Allocator_calloc(allocator, 1, sizeof(struct TestFramework));
+     Identity_set(tf);
+     tf->alloc = allocator;
+     tf->rand = rand;
+@@ -189,7 +189,7 @@
+ {
+     // ifaceA is the client, ifaceB is the server
+     struct TestFramework_Link* link =
+-        Allocator_calloc(client->alloc, sizeof(struct TestFramework_Link), 1);
++        Allocator_calloc(client->alloc, 1, sizeof(struct TestFramework_Link));
+     Identity_set(link);
+     link->clientIf.send = sendClient;
+     link->serverIf.send = sendServer;
+--- a/test/testcjdroute.c	2025-05-20 18:49:05.085446352 +0800
++++ b/test/testcjdroute.c	2025-05-20 18:49:05.087446384 +0800
+@@ -113,7 +113,7 @@
+ 
+ static void** initFuzzTests(struct Allocator* alloc, struct Random* rand)
+ {
+-    void** contexts = Allocator_calloc(alloc, sizeof(char*), FUZZ_TEST_COUNT);
++    void** contexts = Allocator_calloc(alloc, FUZZ_TEST_COUNT, sizeof(char*));
+     for (int i = 0; i < FUZZ_TEST_COUNT; i++) {
+         contexts[i] = FUZZ_TESTS[i].init(alloc, rand);
+     }
+--- a/test/Beacon_test.c	2025-05-20 18:49:05.092446465 +0800
++++ b/test/Beacon_test.c	2025-05-20 18:49:05.094446497 +0800
+@@ -169,7 +169,7 @@
+ #endif
+ 
+ 
+-    struct TwoNodes* out = Allocator_calloc(alloc, sizeof(struct TwoNodes), 1);
++    struct TwoNodes* out = Allocator_calloc(alloc, 1, sizeof(struct TwoNodes));
+     Identity_set(out);
+     out->tunB.send = incomingTunB;
+     out->tunA.send = incomingTunA;
+--- a/test/Main_fuzz_test.c	2025-05-20 18:49:05.097446546 +0800
++++ b/test/Main_fuzz_test.c	2025-05-20 18:49:05.099446578 +0800
+@@ -101,7 +101,7 @@
+     struct Log* logger = WriterLog_new(logwriter, allocator);
+ 
+     struct EventBase* base = EventBase_new(allocator);
+-    struct Context* ctx = Allocator_calloc(allocator, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(allocator, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->base = base;
+ 
+--- a/admin/Admin.c	2025-05-20 18:49:05.104446658 +0800
++++ b/admin/Admin.c	2025-05-20 18:49:05.106446691 +0800
+@@ -374,7 +374,7 @@
+         admin->map.values[index]->timeOfLastMessage = now;
+     } else if (authed) {
+         struct Allocator* entryAlloc = Allocator_child(admin->allocator);
+-        struct MapValue* mv = Allocator_calloc(entryAlloc, sizeof(struct MapValue), 1);
++        struct MapValue* mv = Allocator_calloc(entryAlloc, 1, sizeof(struct MapValue));
+         mv->timeOfLastMessage = now;
+         mv->allocator = entryAlloc;
+         struct Sockaddr* storedAddr = Sockaddr_clone(src, entryAlloc);
+@@ -570,7 +570,7 @@
+                         String* password)
+ {
+     struct Allocator* alloc = ai->alloc;
+-    struct Admin_pvt* admin = Allocator_calloc(alloc, sizeof(struct Admin_pvt), 1);
++    struct Admin_pvt* admin = Allocator_calloc(alloc, 1, sizeof(struct Admin_pvt));
+     Identity_set(admin);
+     admin->allocator = alloc;
+     admin->logger = logger;
+--- a/admin/angel/Core.c	2025-05-20 18:49:05.110446755 +0800
++++ b/admin/angel/Core.c	2025-05-20 18:49:05.112446788 +0800
+@@ -394,7 +394,7 @@
+     Allocator_admin_register(alloc, admin);
+     Sign_admin_register(privateKey, admin, rand, alloc);
+ 
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+     ctx->admin = admin;
+--- a/subnode/AddrSet.c	2025-05-20 18:49:05.116446852 +0800
++++ b/subnode/AddrSet.c	2025-05-20 18:49:05.118446885 +0800
+@@ -66,7 +66,7 @@
+     int idx = indexOf(ap, addr, m);
+     if (idx != -1) { return; }
+     struct Allocator* alloc = Allocator_child(ap->alloc);
+-    struct Elem* el = Allocator_calloc(alloc, sizeof(struct Elem), 1);
++    struct Elem* el = Allocator_calloc(alloc, 1, sizeof(struct Elem));
+     el->alloc = alloc;
+     Bits_memcpy(&el->addr, addr, sizeof(struct Address));
+     Identity_set(el);
+@@ -109,7 +109,7 @@
+ struct AddrSet* AddrSet_new(struct Allocator* allocator)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct AddrSet_pvt* out = Allocator_calloc(alloc, sizeof(struct AddrSet_pvt), 1);
++    struct AddrSet_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct AddrSet_pvt));
+     out->alloc = alloc;
+     out->addrList = ArrayList_OfAddrs_new(alloc);
+     Identity_set(out);
+--- a/subnode/ReachabilityCollector.c	2025-05-20 18:49:05.123446965 +0800
++++ b/subnode/ReachabilityCollector.c	2025-05-20 18:49:05.125446998 +0800
+@@ -154,7 +154,7 @@
+         ReachabilityCollector_unreachable(&rcp->pub, &oldPi->pub.addr);
+     }
+     struct Allocator* piAlloc = Allocator_child(rcp->alloc);
+-    struct PeerInfo_pvt* pi = Allocator_calloc(piAlloc, sizeof(struct PeerInfo_pvt), 1);
++    struct PeerInfo_pvt* pi = Allocator_calloc(piAlloc, 1, sizeof(struct PeerInfo_pvt));
+     Identity_set(pi);
+     pi->rcp = rcp;
+     Bits_memcpy(&pi->pub.addr, nodeAddr, Address_SIZE);
+@@ -278,7 +278,7 @@
+ {
+     struct MsgCore_Promise* query =
+         MsgCore_createQuery(rcp->msgCore, TIMEOUT_MILLISECONDS, rcp->alloc);
+-    struct Query* q = Allocator_calloc(query->alloc, sizeof(struct Query), 1);
++    struct Query* q = Allocator_calloc(query->alloc, 1, sizeof(struct Query));
+     Identity_set(q);
+     q->rcp = rcp;
+     query->userData = q;
+@@ -538,7 +538,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct ReachabilityCollector_pvt* rcp =
+-        Allocator_calloc(alloc, sizeof(struct ReachabilityCollector_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct ReachabilityCollector_pvt));
+     rcp->myAddr = myAddr;
+     rcp->msgCore = msgCore;
+     rcp->alloc = alloc;
+--- a/subnode/SupernodeHunter.c	2025-05-20 18:49:05.129447062 +0800
++++ b/subnode/SupernodeHunter.c	2025-05-20 18:49:05.131447095 +0800
+@@ -94,7 +94,7 @@
+                                struct Allocator* alloc)
+ {
+     struct SupernodeHunter_pvt* snp = Identity_check((struct SupernodeHunter_pvt*) snh);
+-    struct Address** out = Allocator_calloc(alloc, sizeof(char*), snp->authorizedSnodes->length);
++    struct Address** out = Allocator_calloc(alloc, snp->authorizedSnodes->length, sizeof(char*));
+     for (int i = 0; i < snp->authorizedSnodes->length; i++) {
+         out[i] = AddrSet_get(snp->authorizedSnodes, i);
+     }
+@@ -169,7 +169,7 @@
+ static void adoptSupernode(struct SupernodeHunter_pvt* snp, struct Address* candidate)
+ {
+     struct MsgCore_Promise* qp = MsgCore_createQuery(snp->msgCore, 0, snp->alloc);
+-    struct Query* q = Allocator_calloc(qp->alloc, sizeof(struct Query), 1);
++    struct Query* q = Allocator_calloc(qp->alloc, 1, sizeof(struct Query));
+     Identity_set(q);
+     q->snp = snp;
+     q->sendTime = Time_currentTimeMilliseconds(snp->base);
+@@ -233,7 +233,7 @@
+ static void updateSnodePath(struct SupernodeHunter_pvt* snp)
+ {
+     struct MsgCore_Promise* qp = MsgCore_createQuery(snp->msgCore, 0, snp->alloc);
+-    struct Query* q = Allocator_calloc(qp->alloc, sizeof(struct Query), 1);
++    struct Query* q = Allocator_calloc(qp->alloc, 1, sizeof(struct Query));
+     Identity_set(q);
+     q->snp = snp;
+     q->sendTime = Time_currentTimeMilliseconds(snp->base);
+@@ -255,7 +255,7 @@
+ {
+     /*
+     struct MsgCore_Promise* qp = MsgCore_createQuery(snp->msgCore, 0, snp->alloc);
+-    struct Query* q = Allocator_calloc(qp->alloc, sizeof(struct Query), 1);
++    struct Query* q = Allocator_calloc(qp->alloc, 1, sizeof(struct Query));
+     Identity_set(q);
+     q->snp = snp;
+     q->sendTime = Time_currentTimeMilliseconds(snp->base);
+@@ -444,7 +444,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct SupernodeHunter_pvt* out =
+-        Allocator_calloc(alloc, sizeof(struct SupernodeHunter_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct SupernodeHunter_pvt));
+     Identity_set(out);
+     out->authorizedSnodes = AddrSet_new(alloc);
+     out->blacklist = AddrSet_new(alloc);
+--- a/subnode/SubnodePathfinder.c	2025-05-20 18:49:05.136447175 +0800
++++ b/subnode/SubnodePathfinder.c	2025-05-20 18:49:05.138447207 +0800
+@@ -213,7 +213,7 @@
+ 
+     struct MsgCore_Promise* qp = MsgCore_createQuery(pf->msgCore, 0, pf->alloc);
+ 
+-    struct SnodeQuery* snq = Allocator_calloc(qp->alloc, sizeof(struct SnodeQuery), 1);
++    struct SnodeQuery* snq = Allocator_calloc(qp->alloc, 1, sizeof(struct SnodeQuery));
+     Identity_set(snq);
+     snq->pf = pf;
+ 
+@@ -315,7 +315,7 @@
+     // We have a path to the node but the session is not setup, lets ping them...
+     struct MsgCore_Promise* qp = MsgCore_createQuery(pf->msgCore, 0, pf->alloc);
+ 
+-    struct Ping* usp = Allocator_calloc(qp->alloc, sizeof(struct Ping), 1);
++    struct Ping* usp = Allocator_calloc(qp->alloc, 1, sizeof(struct Ping));
+     Identity_set(usp);
+     usp->pf = pf;
+ 
+@@ -571,7 +571,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct SubnodePathfinder_pvt* pf =
+-        Allocator_calloc(alloc, sizeof(struct SubnodePathfinder_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct SubnodePathfinder_pvt));
+     Identity_set(pf);
+     pf->alloc = alloc;
+     pf->log = log;
+--- a/subnode/MsgCore.c	2025-05-20 18:49:05.142447272 +0800
++++ b/subnode/MsgCore.c	2025-05-20 18:49:05.144447305 +0800
+@@ -86,7 +86,7 @@
+         return NULL;
+     }
+ 
+-    struct ReplyContext* rc = Allocator_calloc(msg->alloc, sizeof(struct ReplyContext), 1);
++    struct ReplyContext* rc = Allocator_calloc(msg->alloc, 1, sizeof(struct ReplyContext));
+     rc->src = src;
+     rc->content = content;
+     rc->msg = msg;
+@@ -205,7 +205,7 @@
+     struct Pinger_Ping* p = Pinger_newPing(
+         NULL, pingerOnResponse, pingerSendPing, timeoutMilliseconds, allocator, mcp->pinger);
+     struct MsgCore_Promise_pvt* out =
+-        Allocator_calloc(p->pingAlloc, sizeof(struct MsgCore_Promise_pvt), 1);
++        Allocator_calloc(p->pingAlloc, 1, sizeof(struct MsgCore_Promise_pvt));
+     Identity_set(out);
+     p->context = out;
+     out->pub.alloc = p->pingAlloc;
+@@ -266,7 +266,7 @@
+ {
+     struct MsgCore_pvt* mcp = Identity_check((struct MsgCore_pvt*) core);
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct QueryHandler* qh = Allocator_calloc(alloc, sizeof(struct QueryHandler), 1);
++    struct QueryHandler* qh = Allocator_calloc(alloc, 1, sizeof(struct QueryHandler));
+     qh->queryType = String_new(queryType, alloc);
+     qh->alloc = alloc;
+     qh->mcp = mcp;
+@@ -344,7 +344,7 @@
+                             struct EncodingScheme* scheme)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct MsgCore_pvt* mcp = Allocator_calloc(alloc, sizeof(struct MsgCore_pvt), 1);
++    struct MsgCore_pvt* mcp = Allocator_calloc(alloc, 1, sizeof(struct MsgCore_pvt));
+     Identity_set(mcp);
+     mcp->pub.interRouterIf.send = incoming;
+     mcp->qh = ArrayList_OfQueryHandlers_new(alloc);
+--- a/subnode/BoilerplateResponder.c	2025-05-20 18:49:05.148447369 +0800
++++ b/subnode/BoilerplateResponder.c	2025-05-20 18:49:05.150447401 +0800
+@@ -40,7 +40,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct BoilerplateResponder_pvt* brp =
+-        Allocator_calloc(alloc, sizeof(struct BoilerplateResponder_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct BoilerplateResponder_pvt));
+     Identity_set(brp);
+     brp->myScheme = myScheme;
+     brp->mySchemeStr = EncodingScheme_serialize(myScheme, alloc);
+--- a/subnode/ReachabilityAnnouncer.c	2025-05-20 18:49:05.155447482 +0800
++++ b/subnode/ReachabilityAnnouncer.c	2025-05-20 18:49:05.157447514 +0800
+@@ -698,7 +698,7 @@
+     Dict* dict = qp->msg = Dict_new(qp->alloc);
+     qp->cb = onReply;
+ 
+-    struct Query* q = Allocator_calloc(qp->alloc, sizeof(struct Query), 1);
++    struct Query* q = Allocator_calloc(qp->alloc, 1, sizeof(struct Query));
+     Identity_set(q);
+     q->rap = rap;
+     q->msg = msg;
+@@ -788,7 +788,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct ReachabilityAnnouncer_pvt* rap =
+-        Allocator_calloc(alloc, sizeof(struct ReachabilityAnnouncer_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct ReachabilityAnnouncer_pvt));
+     Identity_set(rap);
+     rap->alloc = alloc;
+     rap->log = log;
+--- a/subnode/PingResponder.c	2025-05-20 18:49:05.161447579 +0800
++++ b/subnode/PingResponder.c	2025-05-20 18:49:05.163447611 +0800
+@@ -76,7 +76,7 @@
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+     struct PingResponder_pvt* prp =
+-        Allocator_calloc(alloc, sizeof(struct PingResponder_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct PingResponder_pvt));
+     Identity_set(prp);
+     prp->log = log;
+     prp->alloc = alloc;
+--- a/wire/Message.c	2025-05-20 18:49:05.167447676 +0800
++++ b/wire/Message.c	2025-05-20 18:49:05.168447692 +0800
+@@ -20,7 +20,7 @@
+                                           struct Allocator* alloc)
+ {
+     uint8_t* buff = Allocator_malloc(alloc, messageLength + amountOfPadding);
+-    struct Message* out = Allocator_calloc(alloc, sizeof(struct Message), 1);
++    struct Message* out = Allocator_calloc(alloc, 1, sizeof(struct Message));
+     out->bytes = &buff[amountOfPadding];
+     out->length = out->capacity = messageLength;
+     out->padding = amountOfPadding;
+--- a/interface/tuntap/SocketWrapper.c	2025-05-20 18:49:05.533453587 +0800
++++ b/interface/tuntap/SocketWrapper.c	2025-05-20 18:49:05.535453619 +0800
+@@ -75,7 +75,7 @@
+ struct SocketWrapper* SocketWrapper_new(struct Allocator* alloc, struct Log* log)
+ {
+     struct SocketWrapper_pvt* context =
+-        Allocator_calloc(alloc, sizeof(struct SocketWrapper_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct SocketWrapper_pvt));
+     Identity_set(context);
+     context->pub.externalIf.send = incomingFromSocket;
+     context->pub.internalIf.send = incomingFromUs;
+--- a/interface/tuntap/TAPWrapper.c	2025-05-20 18:49:05.539453684 +0800
++++ b/interface/tuntap/TAPWrapper.c	2025-05-20 18:49:05.542453732 +0800
+@@ -98,7 +98,7 @@
+                                   struct Log* log,
+                                   struct Allocator* alloc)
+ {
+-    struct TAPWrapper_pvt* out = Allocator_calloc(alloc, sizeof(struct TAPWrapper_pvt), 1);
++    struct TAPWrapper_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct TAPWrapper_pvt));
+     Identity_set(out);
+     out->log = log;
+     out->external.send = receiveMessage;
+--- a/interface/tuntap/ARPServer.c	2025-05-20 18:49:05.545453781 +0800
++++ b/interface/tuntap/ARPServer.c	2025-05-20 18:49:05.547453813 +0800
+@@ -107,7 +107,7 @@
+                                 uint8_t localMac[Ethernet_ADDRLEN],
+                                 struct Allocator* alloc)
+ {
+-    struct ARPServer_pvt* out = Allocator_calloc(alloc, sizeof(struct ARPServer_pvt), 1);
++    struct ARPServer_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct ARPServer_pvt));
+     Identity_set(out);
+     out->external.send = receiveMessage;
+     Iface_plumb(&out->external, external);
+--- a/interface/tuntap/BSDMessageTypeWrapper.c	2025-05-20 18:49:05.551453877 +0800
++++ b/interface/tuntap/BSDMessageTypeWrapper.c	2025-05-20 18:49:05.553453910 +0800
+@@ -86,7 +86,7 @@
+ struct BSDMessageTypeWrapper* BSDMessageTypeWrapper_new(struct Allocator* alloc, struct Log* log)
+ {
+     struct BSDMessageTypeWrapper_pvt* context =
+-        Allocator_calloc(alloc, sizeof(struct BSDMessageTypeWrapper_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct BSDMessageTypeWrapper_pvt));
+     Identity_set(context);
+     context->pub.wireSide.send = receiveMessage;
+     context->pub.inside.send = sendMessage;
+--- a/interface/tuntap/AndroidWrapper.c	2025-05-20 18:49:05.557453974 +0800
++++ b/interface/tuntap/AndroidWrapper.c	2025-05-20 18:49:05.559454006 +0800
+@@ -82,7 +82,7 @@
+ struct AndroidWrapper* AndroidWrapper_new(struct Allocator* alloc, struct Log* log)
+ {
+     struct AndroidWrapper_pvt* context =
+-        Allocator_calloc(alloc, sizeof(struct AndroidWrapper_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct AndroidWrapper_pvt));
+     Identity_set(context);
+     context->pub.externalIf.send = incomingFromWire;
+     context->pub.internalIf.send = incomingFromUs;
+--- a/interface/tuntap/test/BSDMessageTypeWrapper_test.c	2025-05-20 18:49:05.563454071 +0800
++++ b/interface/tuntap/test/BSDMessageTypeWrapper_test.c	2025-05-20 18:49:05.565454104 +0800
+@@ -48,7 +48,7 @@
+ int main()
+ {
+     struct Allocator* alloc = MallocAllocator_new(20000);
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     ctx->outside.send = sendOutside;
+     ctx->inside.send = sendInside;
+--- a/interface/tuntap/test/TUNTools.c	2025-05-20 18:49:05.569454168 +0800
++++ b/interface/tuntap/test/TUNTools.c	2025-05-20 18:49:05.571454200 +0800
+@@ -153,7 +153,7 @@
+     Assert_true(len && len == Sockaddr_getAddress(tunDestAddr, &tunDestAddrBytes));
+     Bits_memcpy(udpDestPointer, tunDestAddrBytes, len);
+ 
+-    struct TUNTools_pvt* ctx = Allocator_calloc(alloc, sizeof(struct TUNTools_pvt), 1);
++    struct TUNTools_pvt* ctx = Allocator_calloc(alloc, 1, sizeof(struct TUNTools_pvt));
+     Identity_set(ctx);
+     ctx->pub.udpIface.send = receiveMessageUDP;
+     ctx->pub.tunIface.send = receiveMessageTUN;
+--- a/interface/tuntap/NDPServer.c	2025-05-20 18:49:05.575454265 +0800
++++ b/interface/tuntap/NDPServer.c	2025-05-20 18:49:05.577454297 +0800
+@@ -144,7 +144,7 @@
+                                 uint8_t localMac[Ethernet_ADDRLEN],
+                                 struct Allocator* alloc)
+ {
+-    struct NDPServer_pvt* out = Allocator_calloc(alloc, sizeof(struct NDPServer_pvt), 1);
++    struct NDPServer_pvt* out = Allocator_calloc(alloc, 1, sizeof(struct NDPServer_pvt));
+     Identity_set(out);
+     out->external.send = receiveMessage;
+     Iface_plumb(&out->external, external);
+--- a/interface/tuntap/windows/TAPInterface.c	2025-05-20 18:49:05.581454362 +0800
++++ b/interface/tuntap/windows/TAPInterface.c	2025-05-20 18:49:05.583454394 +0800
+@@ -255,7 +255,7 @@
+ 
+     Log_debug(logger, "Opening TAP-Windows device [%s] at location [%s]", dev->name, dev->path);
+ 
+-    struct TAPInterface_pvt* tap = Allocator_calloc(alloc, sizeof(struct TAPInterface_pvt), 1);
++    struct TAPInterface_pvt* tap = Allocator_calloc(alloc, 1, sizeof(struct TAPInterface_pvt));
+     Identity_set(tap);
+     tap->base = base;
+     tap->alloc = alloc;
+--- a/interface/tuntap/windows/TAPDevice.c	2025-05-20 18:49:05.587454459 +0800
++++ b/interface/tuntap/windows/TAPDevice.c	2025-05-20 18:49:05.589454491 +0800
+@@ -244,7 +244,7 @@
+         }
+ 
+         if (is_tap_win32_dev(enum_name)) {
+-            struct Taps* tap = Allocator_calloc(alloc, sizeof(struct Taps), 1);
++            struct Taps* tap = Allocator_calloc(alloc, 1, sizeof(struct Taps));
+             Bits_memcpy(tap->guid, enum_name, sizeof(enum_name));
+             Bits_memcpy(tap->name, name_data, sizeof(name_data));
+             if (!taps) {
+--- a/interface/ETHInterface_darwin.c	2025-05-20 18:49:05.594454572 +0800
++++ b/interface/ETHInterface_darwin.c	2025-05-20 18:49:05.596454604 +0800
+@@ -266,7 +266,7 @@
+                                       struct Allocator* alloc,
+                                       struct Log* logger))
+ {
+-    struct ETHInterface_pvt* ctx = Allocator_calloc(alloc, sizeof(struct ETHInterface_pvt), 1);
++    struct ETHInterface_pvt* ctx = Allocator_calloc(alloc, 1, sizeof(struct ETHInterface_pvt));
+     Identity_set(ctx);
+     ctx->pub.generic.iface.send = sendMessage;
+     ctx->pub.generic.alloc = alloc;
+--- a/interface/FramingIface.c	2025-05-20 18:49:05.600454669 +0800
++++ b/interface/FramingIface.c	2025-05-20 18:49:05.602454701 +0800
+@@ -97,7 +97,7 @@
+         }
+         fi->bytesRemaining -= msg->length;
+         Allocator_adopt(fi->frameAlloc, msg->alloc);
+-        struct MessageList* parts = Allocator_calloc(fi->frameAlloc, sizeof(struct MessageList), 1);
++        struct MessageList* parts = Allocator_calloc(fi->frameAlloc, 1, sizeof(struct MessageList));
+         parts->msg = msg;
+         parts->next = fi->frameParts;
+         fi->frameParts = parts;
+@@ -139,7 +139,7 @@
+ 
+         } else {
+             fi->frameAlloc = Allocator_child(fi->alloc);
+-            struct Message* m = Allocator_calloc(fi->frameAlloc, sizeof(struct Message), 1);
++            struct Message* m = Allocator_calloc(fi->frameAlloc, 1, sizeof(struct Message));
+             m->associatedFd = msg->associatedFd;
+             m->capacity = m->length = msg->length + 4;
+             m->bytes = Allocator_calloc(fi->frameAlloc, m->length, 1);
+@@ -149,7 +149,7 @@
+             Er_assert(Message_epush(m, fi->header.bytes, 4));
+ 
+             fi->bytesRemaining -= msg->length;
+-            fi->frameParts = Allocator_calloc(fi->frameAlloc, sizeof(struct MessageList), 1);
++            fi->frameParts = Allocator_calloc(fi->frameAlloc, 1, sizeof(struct MessageList));
+             fi->frameParts->msg = m;
+             fi->frameParts->next = NULL;
+         }
+--- a/interface/ASynchronizer.c	2025-05-20 18:49:05.606454766 +0800
++++ b/interface/ASynchronizer.c	2025-05-20 18:49:05.608454798 +0800
+@@ -119,7 +119,7 @@
+                                         struct EventBase* base,
+                                         struct Log* log)
+ {
+-    struct ASynchronizer_pvt* ctx = Allocator_calloc(alloc, sizeof(struct ASynchronizer_pvt), 1);
++    struct ASynchronizer_pvt* ctx = Allocator_calloc(alloc, 1, sizeof(struct ASynchronizer_pvt));
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+     ctx->base = base;
+--- a/interface/test/FramingIface_fuzz_test.c	2025-05-20 18:49:05.612454863 +0800
++++ b/interface/test/FramingIface_fuzz_test.c	2025-05-20 18:49:05.614454895 +0800
+@@ -68,7 +68,7 @@
+ 
+ void* CJDNS_FUZZ_INIT(struct Allocator* alloc, struct Random* rand)
+ {
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     ctx->iface.send = ifaceRecvMsg;
+     ctx->fi = FramingIface_new(BUF_SZ, &ctx->outer, alloc);
+     Iface_plumb(&ctx->iface, ctx->fi);
+--- a/interface/ETHInterface_linux.c	2025-05-20 18:49:05.619454976 +0800
++++ b/interface/ETHInterface_linux.c	2025-05-20 18:49:05.621455008 +0800
+@@ -235,7 +235,7 @@
+                                       struct Allocator* alloc,
+                                       struct Log* logger))
+ {
+-    struct ETHInterface_pvt* ctx = Allocator_calloc(alloc, sizeof(struct ETHInterface_pvt), 1);
++    struct ETHInterface_pvt* ctx = Allocator_calloc(alloc, 1, sizeof(struct ETHInterface_pvt));
+     Identity_set(ctx);
+     ctx->pub.generic.iface.send = sendMessage;
+     ctx->pub.generic.alloc = alloc;
+--- a/interface/UDPInterface.c	2025-05-20 18:49:05.625455072 +0800
++++ b/interface/UDPInterface.c	2025-05-20 18:49:05.627455105 +0800
+@@ -222,7 +222,7 @@
+ 
+     uint16_t commPort = Sockaddr_getPort(uai->generic.addr);
+ 
+-    struct UDPInterface_pvt* context = Allocator_calloc(alloc, sizeof(struct UDPInterface_pvt), 1);
++    struct UDPInterface_pvt* context = Allocator_calloc(alloc, 1, sizeof(struct UDPInterface_pvt));
+     Identity_set(context);
+     context->log = logger;
+     context->allocator = alloc;
+--- a/interface/addressable/AddrIfaceMuxer.c	2025-05-20 18:49:05.631455169 +0800
++++ b/interface/addressable/AddrIfaceMuxer.c	2025-05-20 18:49:05.634455218 +0800
+@@ -101,7 +101,7 @@
+ {
+     struct AddrIfaceMuxer_pvt* m = Identity_check((struct AddrIfaceMuxer_pvt*) muxer);
+     struct AddrIfaceMuxer_Iface* cli =
+-        Allocator_calloc(alloc, sizeof(struct AddrIfaceMuxer_Iface), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct AddrIfaceMuxer_Iface));
+     cli->iface.send = incomingFromInputIf;
+     cli->muxer = m;
+     cli->alloc = alloc;
+--- a/interface/addressable/PacketHeaderToUDPAddrIface.c	2025-05-20 18:49:05.638455282 +0800
++++ b/interface/addressable/PacketHeaderToUDPAddrIface.c	2025-05-20 18:49:05.640455315 +0800
+@@ -106,7 +106,7 @@
+                                                                   struct Sockaddr* addr)
+ {
+     struct PacketHeaderToUDPAddrIface_pvt* context =
+-        Allocator_calloc(alloc, sizeof(struct PacketHeaderToUDPAddrIface_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct PacketHeaderToUDPAddrIface_pvt));
+     Identity_set(context);
+ 
+     context->pub.udpIf.addr = Sockaddr_clone(addr, alloc);
+--- a/interface/addressable/AddrIfaceAdapter.c	2025-05-20 18:49:05.644455379 +0800
++++ b/interface/addressable/AddrIfaceAdapter.c	2025-05-20 18:49:05.646455412 +0800
+@@ -50,7 +50,7 @@
+ struct AddrIfaceAdapter* AddrIfaceAdapter_new(struct Allocator* alloc)
+ {
+     struct AddrIfaceAdapter_pvt* context =
+-        Allocator_calloc(alloc, sizeof(struct AddrIfaceAdapter_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct AddrIfaceAdapter_pvt));
+     context->pub.generic.addr = Sockaddr_clone(Sockaddr_LOOPBACK, alloc);
+     context->pub.generic.alloc = alloc;
+     context->pub.generic.iface.send = incomingFromAddrIf;
+--- a/benc/Dict.c	2025-05-20 18:49:05.651455492 +0800
++++ b/benc/Dict.c	2025-05-20 18:49:05.653455525 +0800
+@@ -92,7 +92,7 @@
+ /** @see Object.h */
+ Dict* Dict_new(struct Allocator* allocator)
+ {
+-    return Allocator_calloc(allocator, sizeof(Dict), 1);
++    return Allocator_calloc(allocator, 1, sizeof(Dict));
+ }
+ 
+ /**
+--- a/benc/List.c	2025-05-20 18:49:05.657455589 +0800
++++ b/benc/List.c	2025-05-20 18:49:05.659455621 +0800
+@@ -21,7 +21,7 @@
+ 
+ List* List_new(struct Allocator* alloc)
+ {
+-    return Allocator_calloc(alloc, sizeof(List), 1);
++    return Allocator_calloc(alloc, 1, sizeof(List));
+ }
+ 
+ int32_t List_size(const List* list)
+--- a/benc/serialization/json/JsonBencSerializer.c	2025-05-20 18:49:05.663455686 +0800
++++ b/benc/serialization/json/JsonBencSerializer.c	2025-05-20 18:49:05.665455719 +0800
+@@ -440,7 +440,7 @@
+         }
+ 
+         /* Allocate the entry. */
+-        struct Dict_Entry* entry = Allocator_calloc(allocator, sizeof(struct Dict_Entry), 1);
++        struct Dict_Entry* entry = Allocator_calloc(allocator, 1, sizeof(struct Dict_Entry));
+         entry->key = key;
+         entry->val = value;
+         if (last) {
+@@ -509,7 +509,7 @@
+ 
+         case '[':;
+             // List.
+-            List* list = Allocator_calloc(allocator, sizeof(List), 1);
++            List* list = Allocator_calloc(allocator, 1, sizeof(List));
+             ret = parseList(reader, allocator, list);
+             out->type = Object_LIST;
+             out->as.list = list;
+@@ -517,7 +517,7 @@
+ 
+         case '{':;
+             // Dictionary
+-            Dict* dict = Allocator_calloc(allocator, sizeof(Dict), 1);
++            Dict* dict = Allocator_calloc(allocator, 1, sizeof(Dict));
+             ret = parseDictionary(reader, allocator, dict);
+             out->type = Object_DICT;
+             out->as.dictionary = dict;
+--- a/benc/serialization/json/JsonBencMessageReader.c	2025-05-20 18:49:05.669455783 +0800
++++ b/benc/serialization/json/JsonBencMessageReader.c	2025-05-20 18:49:05.671455815 +0800
+@@ -212,7 +212,7 @@
+             Er(skip(ctx, 1));
+             Er(parseWhitespaceAndComments(ctx));
+         }
+-        struct List_Item* item = Allocator_calloc(ctx->alloc, sizeof(struct List_Item), 1);
++        struct List_Item* item = Allocator_calloc(ctx->alloc, 1, sizeof(struct List_Item));
+         item->elem = Er(parseGeneric(ctx));
+         if (last) {
+             last->next = item;
+@@ -245,7 +245,7 @@
+             Er(skip(ctx, 1));
+             Er(parseWhitespaceAndComments(ctx));
+         }
+-        struct Dict_Entry* entry = Allocator_calloc(ctx->alloc, sizeof(struct Dict_Entry), 1);
++        struct Dict_Entry* entry = Allocator_calloc(ctx->alloc, 1, sizeof(struct Dict_Entry));
+         entry->key = Er(parseString(ctx));
+         Er(parseWhitespaceAndComments(ctx));
+         if (Er(assertChar(ctx, ':', ctx->lax))) {
+@@ -264,7 +264,7 @@
+ 
+ static Er_DEFUN(Object* parseGeneric(struct Context* ctx))
+ {
+-    Object* out = Allocator_calloc(ctx->alloc, sizeof(Object), 1);
++    Object* out = Allocator_calloc(ctx->alloc, 1, sizeof(Object));
+     uint8_t c = Er(peak(ctx));
+     switch (c) {
+         case '-':
+--- a/benc/serialization/standard/BencMessageReader.c	2025-05-20 18:49:05.675455880 +0800
++++ b/benc/serialization/standard/BencMessageReader.c	2025-05-20 18:49:05.677455912 +0800
+@@ -92,7 +92,7 @@
+ static Er_DEFUN(Object* readGeneric(struct Message* msg, struct Allocator* alloc))
+ {
+     uint8_t chr = Er(Message_epop8(msg));
+-    Object* out = Allocator_calloc(alloc, sizeof(Object), 1);
++    Object* out = Allocator_calloc(alloc, 1, sizeof(Object));
+     switch (chr) {
+         case 'l': {
+             out->type = Object_LIST;
+--- a/tunnel/test/IpTunnel_test.c	2025-05-20 18:49:05.681455977 +0800
++++ b/tunnel/test/IpTunnel_test.c	2025-05-20 18:49:05.683456009 +0800
+@@ -278,10 +278,10 @@
+ 
+     pushRouteDataHeaders(ctx, msg);
+ 
+-    struct IfaceContext* nodeIf = Allocator_calloc(alloc, sizeof(struct IfaceContext), 1);
++    struct IfaceContext* nodeIf = Allocator_calloc(alloc, 1, sizeof(struct IfaceContext));
+     nodeIf->ctx = ctx;
+     nodeIf->iface.send = responseWithIpCallback;
+-    struct IfaceContext* tunIf = Allocator_calloc(alloc, sizeof(struct IfaceContext), 1);
++    struct IfaceContext* tunIf = Allocator_calloc(alloc, 1, sizeof(struct IfaceContext));
+     tunIf->ctx = ctx;
+     tunIf->iface.send = messageToTun;
+     Iface_plumb(&nodeIf->iface, &ipTun->nodeInterface);
+@@ -371,7 +371,7 @@
+     struct EventBase* eb = EventBase_new(alloc);
+     struct Log* logger = FileWriterLog_new(stdout, alloc);
+     struct Random* rand = Random_new(alloc, logger, NULL);
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     uint8_t privateKey[32];
+     Identity_set(ctx);
+     ctx->alloc = alloc;
+--- a/tunnel/RouteGen.c	2025-05-20 18:49:05.688456090 +0800
++++ b/tunnel/RouteGen.c	2025-05-20 18:49:05.690456122 +0800
+@@ -138,7 +138,7 @@
+     Assert_true(Sockaddr_getAddress(sa, &addr) == 4);
+     Bits_memcpy(&addrNum, addr, 4);
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct Prefix4* out = Allocator_calloc(alloc, sizeof(struct Prefix4), 1);
++    struct Prefix4* out = Allocator_calloc(alloc, 1, sizeof(struct Prefix4));
+     out->bits = Endian_bigEndianToHost32(addrNum);
+     int pfx = Sockaddr_getPrefix(sa);
+     Assert_true(pfx > -1);
+@@ -157,7 +157,7 @@
+     Assert_true(Sockaddr_getAddress(sa, &addr) == 16);
+     Bits_memcpy(&longs, addr, 16);
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct Prefix6* out = Allocator_calloc(alloc, sizeof(struct Prefix6), 1);
++    struct Prefix6* out = Allocator_calloc(alloc, 1, sizeof(struct Prefix6));
+     out->highBits = Endian_bigEndianToHost64(longs.highBits_be);
+     out->lowBits = Endian_bigEndianToHost64(longs.lowBits_be);
+     int pfx = Sockaddr_getPrefix(sa);
+@@ -297,7 +297,7 @@
+ {
+     struct ArrayList_OfPrefix4* result = ArrayList_OfPrefix4_new(alloc);
+     for (int i = 32 - toInvert->prefix; i < 32; i++) {
+-        struct Prefix4* pfx = Allocator_calloc(alloc, sizeof(struct Prefix4), 1);
++        struct Prefix4* pfx = Allocator_calloc(alloc, 1, sizeof(struct Prefix4));
+         pfx->bits = ( toInvert->bits & ((uint32_t)~0 << i) ) ^ ((uint32_t)1 << i);
+         pfx->prefix = 32 - i;
+         ArrayList_OfPrefix4_add(result, pfx);
+@@ -309,7 +309,7 @@
+ {
+     struct ArrayList_OfPrefix6* result = ArrayList_OfPrefix6_new(alloc);
+     for (int i = 128 - toInvert->prefix; i < 128; i++) {
+-        struct Prefix6* pfx = Allocator_calloc(alloc, sizeof(struct Prefix6), 1);
++        struct Prefix6* pfx = Allocator_calloc(alloc, 1, sizeof(struct Prefix6));
+         if (i >= 64) {
+             pfx->highBits = ( toInvert->highBits & (~((uint64_t)0) << (i-64)) ) ^
+                 (((uint64_t)1) << (i-64));
+@@ -450,7 +450,7 @@
+ 
+ static struct ArrayList_OfPrefix4* mkPseudoDefault4(struct Allocator* alloc)
+ {
+-    struct Prefix4* pfxs = Allocator_calloc(alloc, sizeof(struct Prefix4), 2);
++    struct Prefix4* pfxs = Allocator_calloc(alloc, 2, sizeof(struct Prefix4));
+     pfxs[0].prefix = 1;
+     pfxs[1].prefix = 1;
+     pfxs[1].bits = 0x80000000;
+@@ -462,7 +462,7 @@
+ 
+ static struct ArrayList_OfPrefix6* mkPseudoDefault6(struct Allocator* alloc)
+ {
+-    struct Prefix6* pfxs = Allocator_calloc(alloc, sizeof(struct Prefix6), 2);
++    struct Prefix6* pfxs = Allocator_calloc(alloc, 2, sizeof(struct Prefix6));
+     pfxs[0].prefix = 1;
+     pfxs[1].prefix = 1;
+     pfxs[1].highBits = 0x8000000000000000ull;
+@@ -652,7 +652,7 @@
+ 
+ static struct Prefix46* getGeneratedRoutes(struct RouteGen_pvt* rp, struct Allocator* alloc)
+ {
+-    struct Prefix46* out = Allocator_calloc(alloc, sizeof(struct Prefix46), 1);
++    struct Prefix46* out = Allocator_calloc(alloc, 1, sizeof(struct Prefix46));
+     if (rp->prefixes4->length > 0) {
+         out->prefix4 = genPrefixes4(rp->prefixes4, rp->exceptions4, rp->localPrefixes4, alloc);
+         if (isDefaultRoute4(out->prefix4)) {
+@@ -686,7 +686,7 @@
+     struct RouteGen_pvt* rp = Identity_check((struct RouteGen_pvt*) rg);
+     struct Prefix46* p46 = getGeneratedRoutes(rp, tempAlloc);
+     struct Sockaddr** prefixSet =
+-        Allocator_calloc(tempAlloc, sizeof(char*), p46->prefix4->length + p46->prefix6->length);
++        Allocator_calloc(tempAlloc, p46->prefix4->length + p46->prefix6->length, sizeof(char*));
+     int prefixNum = 0;
+     for (int i = 0; i < p46->prefix4->length; i++) {
+         struct Prefix4* pfx4 = ArrayList_OfPrefix4_get(p46->prefix4, i);
+@@ -723,7 +723,7 @@
+ struct RouteGen* RouteGen_new(struct Allocator* allocator, struct Log* log)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct RouteGen_pvt* rp = Allocator_calloc(alloc, sizeof(struct RouteGen_pvt), 1);
++    struct RouteGen_pvt* rp = Allocator_calloc(alloc, 1, sizeof(struct RouteGen_pvt));
+     rp->prefixes6 = ArrayList_OfPrefix6_new(alloc);
+     rp->localPrefixes6 = ArrayList_OfPrefix6_new(alloc);
+     rp->exceptions6 = ArrayList_OfPrefix6_new(alloc);
+--- a/tunnel/RouteGen_admin.c	2025-05-20 18:49:05.693456171 +0800
++++ b/tunnel/RouteGen_admin.c	2025-05-20 18:49:05.695456203 +0800
+@@ -191,7 +191,7 @@
+ 
+ void RouteGen_admin_register(struct RouteGen* rg, struct Admin* admin, struct Allocator* alloc)
+ {
+-    struct RouteGen_admin_Ctx* ctx = Allocator_calloc(alloc, sizeof(struct RouteGen_admin_Ctx), 1);
++    struct RouteGen_admin_Ctx* ctx = Allocator_calloc(alloc, 1, sizeof(struct RouteGen_admin_Ctx));
+     ctx->rg = rg;
+     ctx->admin = admin;
+     Identity_set(ctx);
+--- a/crypto/CryptoAuth.c	2025-05-20 18:49:05.699456268 +0800
++++ b/crypto/CryptoAuth.c	2025-05-20 18:49:05.701456300 +0800
+@@ -919,7 +919,7 @@
+                                   struct Log* logger,
+                                   struct Random* rand)
+ {
+-    struct CryptoAuth_pvt* ca = Allocator_calloc(allocator, sizeof(struct CryptoAuth_pvt), 1);
++    struct CryptoAuth_pvt* ca = Allocator_calloc(allocator, 1, sizeof(struct CryptoAuth_pvt));
+     Identity_set(ca);
+     ca->allocator = allocator;
+     ca->eventBase = eventBase;
+@@ -955,7 +955,7 @@
+     struct CryptoAuth_pvt* ca = Identity_check((struct CryptoAuth_pvt*) cryptoAuth);
+ 
+     struct Allocator* alloc = Allocator_child(ca->allocator);
+-    struct CryptoAuth_User* user = Allocator_calloc(alloc, sizeof(struct CryptoAuth_User), 1);
++    struct CryptoAuth_User* user = Allocator_calloc(alloc, 1, sizeof(struct CryptoAuth_User));
+     user->alloc = alloc;
+     Identity_set(user);
+ 
+@@ -1043,7 +1043,7 @@
+ {
+     struct CryptoAuth_pvt* context = Identity_check((struct CryptoAuth_pvt*) ca);
+     struct CryptoAuth_Session_pvt* session =
+-        Allocator_calloc(alloc, sizeof(struct CryptoAuth_Session_pvt), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct CryptoAuth_Session_pvt));
+     Identity_set(session);
+     session->context = context;
+     session->requireAuth = requireAuth;
+--- a/crypto/test/CryptoAuth_fuzz_test.c	2025-05-20 18:49:05.705456364 +0800
++++ b/crypto/test/CryptoAuth_fuzz_test.c	2025-05-20 18:49:05.707456397 +0800
+@@ -150,7 +150,7 @@
+     }
+     logNode0(ctx, from, "DUPLICATE");
+     struct Allocator* alloc = Allocator_child(ctx->alloc);
+-    struct DelayedMsg* delayed = Allocator_calloc(alloc, sizeof(struct DelayedMsg), 1);
++    struct DelayedMsg* delayed = Allocator_calloc(alloc, 1, sizeof(struct DelayedMsg));
+     delayed->msg = Message_clone(msg, alloc);
+     delayed->next = from->delayedMsgs;
+     from->delayedMsgs = delayed;
+@@ -165,7 +165,7 @@
+     }
+     logNode(ctx, from, "DELAY %d packets (ptr:%p)", afterMsgs, (void*)msg);
+     struct Allocator* alloc = Allocator_child(ctx->alloc);
+-    struct DelayedMsg* delayed = Allocator_calloc(alloc, sizeof(struct DelayedMsg), 1);
++    struct DelayedMsg* delayed = Allocator_calloc(alloc, 1, sizeof(struct DelayedMsg));
+     Allocator_adopt(alloc, msg->alloc);
+     delayed->msg = msg;
+     delayed->sendAfter = from->sendCounter + afterMsgs;
+@@ -269,7 +269,7 @@
+ 
+ void* CJDNS_FUZZ_INIT(struct Allocator* alloc, struct Random* rand)
+ {
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Identity_set(ctx);
+     struct EventBase* base = EventBase_new(alloc);
+     ctx->alloc = alloc;
+--- a/crypto/test/CryptoAuth_test.c	2025-05-20 18:49:05.711456461 +0800
++++ b/crypto/test/CryptoAuth_test.c	2025-05-20 18:49:05.713456494 +0800
+@@ -57,7 +57,7 @@
+                             uint8_t* publicKeyB)
+ {
+     struct Allocator* alloc = MallocAllocator_new(1048576);
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     ctx->alloc = alloc;
+     struct Log* logger = ctx->log = FileWriterLog_new(stdout, alloc);
+     struct Random* rand = ctx->rand = Random_new(alloc, logger, NULL);
+--- a/crypto/test/CryptoAuth_unit_test.c	2025-05-20 18:49:05.716456542 +0800
++++ b/crypto/test/CryptoAuth_unit_test.c	2025-05-20 18:49:05.718456575 +0800
+@@ -83,7 +83,7 @@
+                              uint8_t* authPassword,
+                              struct Allocator* alloc)
+ {
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     struct Log* log = ctx->log = FileWriterLog_new(stdout, alloc);
+     struct EventBase* base = ctx->base = EventBase_new(alloc);
+     struct CryptoAuth* ca = ctx->ca =
+--- a/crypto/random/nanotime/NanotimeEntropyProvider.c	2025-05-20 18:49:05.722456639 +0800
++++ b/crypto/random/nanotime/NanotimeEntropyProvider.c	2025-05-20 18:49:05.724456671 +0800
+@@ -55,7 +55,7 @@
+                                 struct Allocator* alloc)
+ {
+     struct NanotimeEntropyProvider* lep =
+-        Allocator_calloc(alloc, sizeof(struct NanotimeEntropyProvider), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct NanotimeEntropyProvider));
+     Log_info(logger, "Taking clock samples every [%d]ms for random generator", SAMPLE_MILLISECONDS);
+     lep->alloc = alloc;
+     lep->rand = provideTo;
+--- a/crypto/random/Random.c	2025-05-20 18:49:05.728456736 +0800
++++ b/crypto/random/Random.c	2025-05-20 18:49:05.730456768 +0800
+@@ -231,13 +231,13 @@
+                                   struct RandomSeed* seed,
+                                   struct Except* eh)
+ {
+-    union Random_SeedGen* seedGen = Allocator_calloc(alloc, sizeof(union Random_SeedGen), 1);
++    union Random_SeedGen* seedGen = Allocator_calloc(alloc, 1, sizeof(union Random_SeedGen));
+ 
+     if (RandomSeed_get(seed, seedGen->buff)) {
+         Except_throw(eh, "Unable to initialize secure random number generator");
+     }
+ 
+-    struct Random* rand = Allocator_calloc(alloc, sizeof(struct Random), 1);
++    struct Random* rand = Allocator_calloc(alloc, 1, sizeof(struct Random));
+     rand->seedGen = seedGen;
+     rand->seed = seed;
+     rand->nextByte = BUFFSIZE;
+--- a/crypto/random/seed/RandomSeed.c	2025-05-20 18:49:05.734456833 +0800
++++ b/crypto/random/seed/RandomSeed.c	2025-05-20 18:49:05.736456865 +0800
+@@ -79,7 +79,7 @@
+                                   struct Log* logger,
+                                   struct Allocator* alloc)
+ {
+-    struct RandomSeed** rsList = Allocator_calloc(alloc, sizeof(struct RandomSeed), providerCount);
++    struct RandomSeed** rsList = Allocator_calloc(alloc, providerCount, sizeof(struct RandomSeed));
+     int i = 0;
+     for (int j = 0; j < providerCount; j++) {
+         struct RandomSeed* rs = providers[j](alloc);
+--- a/crypto/random/seed/SystemRandomSeed.c	2025-05-20 18:49:05.740456930 +0800
++++ b/crypto/random/seed/SystemRandomSeed.c	2025-05-20 18:49:05.741456946 +0800
+@@ -58,7 +58,7 @@
+     int providerCount = PROVIDERS_COUNT + additionalProviderCount;
+ 
+     RandomSeed_Provider* allProviders =
+-        Allocator_calloc(alloc, sizeof(RandomSeed_Provider), providerCount+1);
++        Allocator_calloc(alloc, providerCount+1, sizeof(RandomSeed_Provider));
+     int i = 0;
+     for (int j = 0; j < additionalProviderCount; j++) {
+         allProviders[i++] = additionalProviders[j];
+--- a/crypto/Sign_admin.c	2025-05-20 18:49:05.745457011 +0800
++++ b/crypto/Sign_admin.c	2025-05-20 18:49:05.747457043 +0800
+@@ -106,7 +106,7 @@
+                          struct Random* rand,
+                          struct Allocator* alloc)
+ {
+-    struct Context* ctx = Allocator_calloc(alloc, sizeof(struct Context), 1);
++    struct Context* ctx = Allocator_calloc(alloc, 1, sizeof(struct Context));
+     Sign_signingKeyPairFromCurve25519(ctx->signingKeypair, privateKey);
+     uint8_t sPubKey[32];
+     Sign_publicKeyFromKeyPair(sPubKey, ctx->signingKeypair);
+--- a/switch/SwitchCore.c	2025-05-20 18:49:05.751457107 +0800
++++ b/switch/SwitchCore.c	2025-05-20 18:49:05.753457140 +0800
+@@ -299,7 +299,7 @@
+                                   struct Allocator* allocator,
+                                   struct EventBase* base)
+ {
+-    struct SwitchCore_pvt* core = Allocator_calloc(allocator, sizeof(struct SwitchCore_pvt), 1);
++    struct SwitchCore_pvt* core = Allocator_calloc(allocator, 1, sizeof(struct SwitchCore_pvt));
+     Identity_set(core);
+     core->allocator = allocator;
+     core->logger = logger;
+--- a/dht/DHTModuleRegistry.c	2025-05-20 18:49:05.757457204 +0800
++++ b/dht/DHTModuleRegistry.c	2025-05-20 18:49:05.759457236 +0800
+@@ -25,9 +25,9 @@
+ struct DHTModuleRegistry* DHTModuleRegistry_new(struct Allocator* allocator, struct Log* log)
+ {
+     struct DHTModuleRegistry* reg =
+-        Allocator_calloc(allocator, sizeof(struct DHTModuleRegistry), 1);
++        Allocator_calloc(allocator, 1, sizeof(struct DHTModuleRegistry));
+     reg->allocator = allocator;
+-    reg->members = Allocator_calloc(allocator, sizeof(char*), 1);
++    reg->members = Allocator_calloc(allocator, 1, sizeof(char*));
+     reg->log = log;
+     return reg;
+ }
+--- a/dht/Pathfinder.c	2025-05-20 18:49:05.763457301 +0800
++++ b/dht/Pathfinder.c	2025-05-20 18:49:05.765457334 +0800
+@@ -487,7 +487,7 @@
+                                        struct Admin* admin)
+ {
+     struct Allocator* alloc = Allocator_child(allocator);
+-    struct Pathfinder_pvt* pf = Allocator_calloc(alloc, sizeof(struct Pathfinder_pvt), 1);
++    struct Pathfinder_pvt* pf = Allocator_calloc(alloc, 1, sizeof(struct Pathfinder_pvt));
+     Identity_set(pf);
+     pf->alloc = alloc;
+     pf->log = log;
+--- a/dht/dhtcore/RouterModule_admin.c	2025-05-20 18:49:05.774457479 +0800
++++ b/dht/dhtcore/RouterModule_admin.c	2025-05-20 18:49:05.776457511 +0800
+@@ -223,7 +223,7 @@
+ 
+     struct RouterModule_Promise* rp =
+         RouterModule_pingNode(addr, timeout, ctx->module, ctx->allocator);
+-    struct Ping* ping = Allocator_calloc(rp->alloc, sizeof(struct Ping), 1);
++    struct Ping* ping = Allocator_calloc(rp->alloc, 1, sizeof(struct Ping));
+     Identity_set(ping);
+     ping->txid = String_clone(txid, rp->alloc);
+     ping->rp = rp;
+@@ -259,7 +259,7 @@
+     struct RouterModule_Promise* rp =
+         RouterModule_getPeers(addr, nearbyLabel, timeout, ctx->module, ctx->allocator);
+ 
+-    struct Ping* ping = Allocator_calloc(rp->alloc, sizeof(struct Ping), 1);
++    struct Ping* ping = Allocator_calloc(rp->alloc, 1, sizeof(struct Ping));
+     Identity_set(ping);
+     ping->txid = String_clone(txid, rp->alloc);
+     ping->rp = rp;
+@@ -295,7 +295,7 @@
+     struct RouterModule_Promise* rp =
+         RouterModule_findNode(nodeToQuery, target, timeout, ctx->module, ctx->allocator);
+ 
+-    struct Ping* ping = Allocator_calloc(rp->alloc, sizeof(struct Ping), 1);
++    struct Ping* ping = Allocator_calloc(rp->alloc, 1, sizeof(struct Ping));
+     Identity_set(ping);
+     ping->txid = String_clone(txid, rp->alloc);
+     ping->rp = rp;
+@@ -327,7 +327,7 @@
+     struct RouterModule_Promise* rp =
+         RouterModule_nextHop(nodeToQuery, target, timeout, ctx->module, ctx->allocator);
+ 
+-    struct Ping* ping = Allocator_calloc(rp->alloc, sizeof(struct Ping), 1);
++    struct Ping* ping = Allocator_calloc(rp->alloc, 1, sizeof(struct Ping));
+     Identity_set(ping);
+     ping->txid = String_clone(txid, rp->alloc);
+     ping->rp = rp;
+--- a/dht/dhtcore/RouterModule.c	2025-05-20 18:49:05.786457673 +0800
++++ b/dht/dhtcore/RouterModule.c	2025-05-20 18:49:05.788457705 +0800
+@@ -209,7 +209,7 @@
+                                            struct Random* rand,
+                                            struct NodeStore* nodeStore)
+ {
+-    struct RouterModule* const out = Allocator_calloc(allocator, sizeof(struct RouterModule), 1);
++    struct RouterModule* const out = Allocator_calloc(allocator, 1, sizeof(struct RouterModule));
+ 
+     struct DHTModule* dm = Allocator_clone(allocator, (&(struct DHTModule) {
+         .name = "RouterModule",
+@@ -359,10 +359,10 @@
+             return 0;
+         }
+         struct Node_Two* nn = NodeStore_getBest(module->nodeStore, target->bytes);
+-        nodeList = Allocator_calloc(message->allocator, sizeof(struct NodeList), 1);
++        nodeList = Allocator_calloc(message->allocator, 1, sizeof(struct NodeList));
+         if (nn) {
+             nodeList->size = 1;
+-            nodeList->nodes = Allocator_calloc(message->allocator, sizeof(char*), 1);
++            nodeList->nodes = Allocator_calloc(message->allocator, 1, sizeof(char*));
+             nodeList->nodes[0] = nn;
+         }
+     }
+@@ -422,7 +422,7 @@
+ 
+     struct Allocator* temp = Allocator_child(pc->pp->pingAlloc);
+     struct Message* msg = Message_new(0, DHTMessage_MAX_SIZE + 512, temp);
+-    struct DHTMessage* dmesg = Allocator_calloc(temp, sizeof(struct DHTMessage), 1);
++    struct DHTMessage* dmesg = Allocator_calloc(temp, 1, sizeof(struct DHTMessage));
+     dmesg->binMessage = msg;
+     dmesg->address = &pc->address;
+     dmesg->asDict = pc->messageDict;
+--- a/dht/dhtcore/SearchRunner_admin.c	2025-05-20 18:49:05.792457769 +0800
++++ b/dht/dhtcore/SearchRunner_admin.c	2025-05-20 18:49:05.794457802 +0800
+@@ -120,7 +120,7 @@
+         Admin_sendMessage(resp, txid, ctx->admin);
+     } else {
+         struct Allocator* alloc = Allocator_child(ctx->allocator);
+-        struct Search* s = Allocator_calloc(alloc, sizeof(struct Search), 1);
++        struct Search* s = Allocator_calloc(alloc, 1, sizeof(struct Search));
+         s->promise = SearchRunner_search(addr, maxRequests, maxRequests, ctx->runner, alloc);
+         s->ctx = ctx;
+         s->txid = String_clone(txid, alloc);
+--- a/dht/dhtcore/RumorMill.c	2025-05-20 18:49:05.798457866 +0800
++++ b/dht/dhtcore/RumorMill.c	2025-05-20 18:49:05.800457899 +0800
+@@ -136,8 +136,8 @@
+     struct Allocator* alloc = Allocator_child(allocator);
+     Address_getPrefix(selfAddr);
+ 
+-    struct RumorMill_pvt* rm = Allocator_calloc(alloc, sizeof(struct RumorMill_pvt), 1);
+-    rm->pub.addresses = Allocator_calloc(alloc, sizeof(struct Address), capacity);
++    struct RumorMill_pvt* rm = Allocator_calloc(alloc, 1, sizeof(struct RumorMill_pvt));
++    rm->pub.addresses = Allocator_calloc(alloc, capacity, sizeof(struct Address));
+     rm->capacity = capacity;
+     rm->selfAddr = Allocator_clone(alloc, selfAddr);
+     rm->log = log;
+--- a/dht/dhtcore/NodeStore.c	2025-05-20 18:49:05.804457963 +0800
++++ b/dht/dhtcore/NodeStore.c	2025-05-20 18:49:05.807458012 +0800
+@@ -116,7 +116,7 @@
+ static struct Node_Link* getLink(struct NodeStore_pvt* store)
+ {
+     store->pub.linkCount++;
+-    return Allocator_calloc(store->alloc, sizeof(struct Node_Link), 1);
++    return Allocator_calloc(store->alloc, 1, sizeof(struct Node_Link));
+ }
+ 
+ static void logLink(struct NodeStore_pvt* store,
+@@ -1354,7 +1354,7 @@
+     struct Allocator* alloc = NULL;
+     if (!child) {
+         alloc = Allocator_child(store->alloc);
+-        child = Allocator_calloc(alloc, sizeof(struct Node_Two), 1);
++        child = Allocator_calloc(alloc, 1, sizeof(struct Node_Two));
+         child->alloc = alloc;
+         Bits_memcpy(&child->address, addr, sizeof(struct Address));
+         child->encodingScheme = EncodingScheme_clone(scheme, child->alloc);
+@@ -1630,7 +1630,7 @@
+     Identity_set(out);
+ 
+     // Create the self node
+-    struct Node_Two* selfNode = Allocator_calloc(alloc, sizeof(struct Node_Two), 1);
++    struct Node_Two* selfNode = Allocator_calloc(alloc, 1, sizeof(struct Node_Two));
+     Assert_true(selfNode);
+     Assert_true(myAddress);
+     Bits_memcpy(&selfNode->address, myAddress, sizeof(struct Address));
+@@ -1774,8 +1774,8 @@
+         int bitsUsed = NumberCompress_bitsUsedForLabel(label);
+         label = (label & Bits_maxBits64(bitsUsed)) | 1 << bitsUsed;
+     }
+-    struct NodeList* out = Allocator_calloc(allocator, sizeof(struct NodeList), 1);
+-    out->nodes = Allocator_calloc(allocator, sizeof(char*), max);
++    struct NodeList* out = Allocator_calloc(allocator, 1, sizeof(struct NodeList));
++    out->nodes = Allocator_calloc(allocator, max, sizeof(char*));
+ 
+     struct Node_Link* next = NULL;
+     RB_FOREACH(next, PeerRBTree, &store->pub.selfNode->peerTree) {
+--- a/dht/dhtcore/SearchRunner.c	2025-05-20 18:49:05.811458076 +0800
++++ b/dht/dhtcore/SearchRunner.c	2025-05-20 18:49:05.813458109 +0800
+@@ -297,7 +297,7 @@
+     }
+ 
+     struct SearchRunner_SearchData* out =
+-        Allocator_calloc(alloc, sizeof(struct SearchRunner_SearchData), 1);
++        Allocator_calloc(alloc, 1, sizeof(struct SearchRunner_SearchData));
+ 
+     if (search) {
+         Bits_memcpy(out->target, &search->target.ip6.bytes, 16);
+--- a/memory/Allocator.c	2025-05-20 18:49:06.431468089 +0800
++++ b/memory/Allocator.c	2025-05-20 18:49:06.434468138 +0800
+@@ -740,21 +740,21 @@
+ 
+     if (!parent->adoptions) {
+         parent->adoptions =
+-            Allocator__calloc(adoptedParent, sizeof(struct Allocator_Adoptions), 1, file, line);
++            Allocator__calloc(adoptedParent, 1, sizeof(struct Allocator_Adoptions), file, line);
+     }
+     if (!child->adoptions) {
+         child->adoptions =
+-            Allocator__calloc(childToAdopt, sizeof(struct Allocator_Adoptions), 1, file, line);
++            Allocator__calloc(childToAdopt, 1, sizeof(struct Allocator_Adoptions), file, line);
+     }
+ 
+     struct Allocator_List* pl =
+-        Allocator__calloc(childToAdopt, sizeof(struct Allocator_List), 1, file, line);
++        Allocator__calloc(childToAdopt, 1, sizeof(struct Allocator_List), file, line);
+     pl->alloc = child;
+     pl->next = parent->adoptions->children;
+     parent->adoptions->children = pl;
+ 
+     struct Allocator_List* cl =
+-        Allocator__calloc(childToAdopt, sizeof(struct Allocator_List), 1, file, line);
++        Allocator__calloc(childToAdopt, 1, sizeof(struct Allocator_List), file, line);
+     cl->alloc = parent;
+     cl->next = child->adoptions->parents;
+     child->adoptions->parents = cl;
