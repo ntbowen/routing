@@ -1,0 +1,33 @@
+--- a/do
++++ b/do
+@@ -9,12 +9,18 @@ fi
+ release="--release"
+ path="release"
++target_arg=""
++target_dir=""
+ if echo "$@" | grep -q '\-\-debug'; then
+     release=""
+     path="debug"
+ fi 
+-RUSTFLAGS="$RUSTFLAGS -g" $CARGO build $release
+-if [ "$NO_TEST" = '' ]; then
+-  RUST_BACKTRACE=1 "./target/$path/testcjdroute" all >/dev/null
++if [ -n "${CARGO_TARGET_TRIPLE:-}" ]; then
++    target_arg="--target $CARGO_TARGET_TRIPLE"
++    target_dir="$CARGO_TARGET_TRIPLE/"
+ fi
++RUSTFLAGS="$RUSTFLAGS -g" $CARGO build $release $target_arg
++if [ "$NO_TEST" = '' ] && [ -z "${CARGO_TARGET_TRIPLE:-}" ]; then
++  RUST_BACKTRACE=1 "./target/$path/testcjdroute" all >/dev/null
++fi
+ 
+ move() {
+@@ -31,6 +37,6 @@ move() {
+   fi
+ }
+-move "./target/$path/cjdroute" ./cjdroute
+-move "./target/$path/cjdnstool" ./cjdnstool
++move "./target/${target_dir}$path/cjdroute" ./cjdroute
++move "./target/${target_dir}$path/cjdnstool" ./cjdnstool
+ 
+ printf '\033[1;32mBuild completed successfully, type ./cjdroute to begin setup.\033[0m\n'
