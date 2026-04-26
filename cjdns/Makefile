@@ -37,7 +37,7 @@ define Package/cjdns
 	SUBMENU:=Routing and Redirection
 	TITLE:=Encrypted near-zero-conf mesh routing protocol
 	URL:=https://github.com/cjdelisle/cjdns
-	DEPENDS:=@!arc @IPV6 +kmod-tun +libnl-tiny +libpthread +librt \
+	DEPENDS:=@!arc @IPV6 +kmod-tun +libnl-tiny +libpthread +librt +libsodium \
 		+libuci-lua +lua-bencode +dkjson +luasocket +lua-sha2
 endef
 
@@ -87,6 +87,11 @@ define Build/Compile
 	TARGET_ARCH="$(CONFIG_ARCH)" \
 	SSP_SUPPORT="$(CONFIG_SSP_SUPPORT)" \
 	GYP_ADDITIONAL_ARGS="-f make-linux" \
+	SODIUM_LIB_DIR="$(STAGING_DIR)/usr/lib" \
+	SODIUM_INCLUDE_DIR="$(STAGING_DIR)/usr/include" \
+	CARGO_TARGET_TRIPLE="x86_64-unknown-linux-musl" \
+	CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER="$(TARGET_CC_NOCACHE)" \
+	CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_AR="$(TARGET_AR)" \
 	CJDNS_BUILD_TMPDIR="$(PKG_BUILD_DIR)/tmp" \
 	$(PKG_DO_VARS) \
 	exec ./do)
@@ -111,7 +116,7 @@ define Package/cjdns/install
 		$(1)/usr/sbin
 
 	$(INSTALL_BIN) \
-		$(PKG_BUILD_DIR)/publictoip6 \
+		$(PKG_BUILD_DIR)/cjdnstool \
 		$(1)/usr/bin
 
 	$(INSTALL_BIN) \
