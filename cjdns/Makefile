@@ -89,9 +89,9 @@ define Build/Compile
 	GYP_ADDITIONAL_ARGS="-f make-linux" \
 	SODIUM_LIB_DIR="$(STAGING_DIR)/usr/lib" \
 	SODIUM_INCLUDE_DIR="$(STAGING_DIR)/usr/include" \
-	CARGO_TARGET_TRIPLE="x86_64-unknown-linux-musl" \
-	CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER="$(TARGET_CC_NOCACHE)" \
-	CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_AR="$(TARGET_AR)" \
+	CARGO_TARGET_TRIPLE="$(ARCH)-unknown-linux-musl" \
+	CARGO_TARGET_$(shell echo $(ARCH) | tr a-z- A-Z_)_UNKNOWN_LINUX_MUSL_LINKER="$(TARGET_CC_NOCACHE)" \
+	CARGO_TARGET_$(shell echo $(ARCH) | tr a-z- A-Z_)_UNKNOWN_LINUX_MUSL_AR="$(TARGET_AR)" \
 	CJDNS_BUILD_TMPDIR="$(PKG_BUILD_DIR)/tmp" \
 	$(PKG_DO_VARS) \
 	exec ./do)
